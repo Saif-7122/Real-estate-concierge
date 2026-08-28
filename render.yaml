@@ -3,8 +3,8 @@ services:
     name: real-estate-concierge
     env: python
     plan: free
-    buildCommand: pip install uv && uv export --format requirements-txt --no-hashes -o requirements.txt && uv pip install --system -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT backend.app:app
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m gunicorn --bind 0.0.0.0:$PORT backend.app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0

@@ -13,7 +13,7 @@ build/
 k8s/secret.yaml
 
 # --- Data / generated ---
-data/*.db
+# data/*.db (ignored globally except for inventory.db)
 data/*.pdf
 
 # --- Editor / OS ---

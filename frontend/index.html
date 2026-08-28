@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Meridian Heights — Sales Concierge</title>
+  <meta name="description" content="Chat with our AI concierge about Meridian Heights units, pricing, and amenities.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header id="chat-header">
+    <div class="header-brand">
+      <h1>Meridian Heights</h1>
+      <span class="header-label">Sales Concierge</span>
+    </div>
+    <div class="header-disclaimer">Demo build — illustrative data, not live inventory.</div>
+  </header>
+
+  <main id="chat-log" role="log" aria-live="polite"></main>
+
+  <footer id="chat-input-bar">
+    <form id="chat-form" autocomplete="off">
+      <textarea
+        id="chat-input"
+        rows="1"
+        maxlength="500"
+        placeholder="Ask about units, pricing, amenities…"
+        aria-label="Your message"
+      ></textarea>
+      <button type="submit" id="send-btn" aria-label="Send message">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 10L17 3L10 17L9 11L3 10Z" fill="currentColor"/>
+        </svg>
+      </button>
+    </form>
+    <div class="char-count"><span id="char-current">0</span>/500</div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

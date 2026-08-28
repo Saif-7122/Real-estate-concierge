@@ -1,0 +1,27 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+
+# --- Secrets ---
+.env
+k8s/secret.yaml
+
+# --- Dev tools ---
+.git/
+.gitignore
+.agents/
+.gemini/
+tests/
+test_*.py
+*.log
+
+# --- Docs / CI ---
+README.md
+observability/
+k8s/
+
+# --- Data (large files not needed in image) ---
+data/*.pdf

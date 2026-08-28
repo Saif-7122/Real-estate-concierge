@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: concierge-config
+  labels:
+    app: concierge
+data:
+  ASTRA_DB_API_ENDPOINT: "https://<your-db-id>-<your-db-region>.apps.astra.datastax.com"
+  ASTRA_DB_KEYSPACE: "default_keyspace"
+  HF_EMBEDDING_MODEL: "BAAI/bge-small-en-v1.5"
+  PYTHONUNBUFFERED: "1"

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: concierge-frontend
+  labels:
+    app: concierge-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: concierge-frontend
+  template:
+    metadata:
+      labels:
+        app: concierge-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: realestate-frontend:v1
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: concierge-frontend-svc
+  labels:
+    app: concierge-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: concierge-frontend
+  ports:
+    - port: 80
+      targetPort: 80

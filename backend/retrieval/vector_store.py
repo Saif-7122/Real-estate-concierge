@@ -4,7 +4,7 @@ import threading
 from functools import lru_cache
 
 from dotenv import load_dotenv
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpointEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_astradb import AstraDBVectorStore
 
 load_dotenv()
@@ -38,7 +38,8 @@ def _get_embeddings_singleton():
         return HuggingFaceEndpointEmbeddings(model=model_name, huggingfacehub_api_token=hf_token)
     else:
         logger.warning("No HF_API_TOKEN found. Falling back to local HuggingFaceEmbeddings. THIS WILL CONSUME ~400MB RAM.")
-        return HuggingFaceEmbeddings(model_name=model_name)
+        from langchain_huggingface import HuggingFaceEmbeddings
+    return HuggingFaceEmbeddings(model_name=model_name)
 
 
 @lru_cache(maxsize=1)
@@ -115,7 +116,8 @@ def get_embeddings(model_name: str = None) -> HuggingFaceEmbeddings:
             "singleton model.  Creating a separate instance (not cached).",
             model_name,
         )
-        return HuggingFaceEmbeddings(model_name=model_name)
+        from langchain_huggingface import HuggingFaceEmbeddings
+    return HuggingFaceEmbeddings(model_name=model_name)
     return _get_embeddings_singleton()
 
 

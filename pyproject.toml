@@ -18,5 +18,9 @@ dependencies = [
     "prometheus-client>=0.26.0",
     "pypdf>=6.16.2",
     "python-dotenv>=1.2.3",
+]
+
+[project.optional-dependencies]
+ingest = [
     "sentence-transformers>=6.0.0",
 ]

@@ -2164,6 +2164,10 @@ dependencies = [
     { name = "prometheus-client" },
     { name = "pypdf" },
     { name = "python-dotenv" },
+]
+
+[package.optional-dependencies]
+ingest = [
     { name = "sentence-transformers" },
 ]
 
@@ -2182,8 +2186,9 @@ requires-dist = [
     { name = "prometheus-client", specifier = ">=0.26.0" },
     { name = "pypdf", specifier = ">=6.16.2" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
-    { name = "sentence-transformers", specifier = ">=6.0.0" },
+    { name = "sentence-transformers", marker = "extra == 'ingest'", specifier = ">=6.0.0" },
 ]
+provides-extras = ["ingest"]
 
 [[package]]
 name = "regex"

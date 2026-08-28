@@ -101,7 +101,9 @@ def get_brochure_retriever(k: int = 4):
 # the cached singletons rather than constructing new instances each time.
 # ---------------------------------------------------------------------------
 
-def get_embeddings(model_name: str = None) -> HuggingFaceEmbeddings:
+from langchain_core.embeddings import Embeddings
+
+def get_embeddings(model_name: str = None) -> Embeddings:
     """Returns the shared HuggingFaceEmbeddings singleton.
 
     The ``model_name`` argument is accepted for API compatibility but is only

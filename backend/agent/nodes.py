@@ -50,7 +50,12 @@ def router_node(state: ConciergeState) -> Dict[str, Any]:
     # Heuristic fallback for offline/local execution
     lower_q = user_query.lower()
     has_structured = any(k in lower_q for k in ["price", "cost", "possession", "available", "unit", "floor", "bhk", "rate", "sqft", "tower"])
-    has_brochure = any(k in lower_q for k in ["amenit", "location", "pool", "gym", "clubhouse", "spec", "developer", "park", "sports", "brochure"])
+    # 'builder', 'developer', 'reputation', 'known', 'company' are brochure-only signals
+    has_brochure = any(k in lower_q for k in [
+        "amenit", "location", "pool", "gym", "clubhouse", "spec",
+        "developer", "park", "sports", "brochure", "builder",
+        "reputation", "well known", "well-known", "company", "established",
+    ])
 
     if has_structured and has_brochure:
         route = "both"
@@ -61,7 +66,31 @@ def router_node(state: ConciergeState) -> Dict[str, Any]:
     else:
         route = "both"
 
-    return {"route": route}
+    # Extract constraints from entire conversation history and current query
+    buyer_profile = state.get("buyer_profile") or {}
+    history = state.get("conversation_history", [])
+
+    messages_to_process = [msg.get("content", "") for msg in history if msg.get("role") == "user"]
+    messages_to_process.append(user_query)
+
+    for content in messages_to_process:
+        if not content:
+            continue
+        bhk_match = re.search(r'(\d+)\s*bhk', content, re.IGNORECASE)
+        if bhk_match:
+            try:
+                buyer_profile["bhk"] = int(bhk_match.group(1))
+            except ValueError:
+                pass
+
+        budget_match = re.search(
+            r'(?:under|less than|budget of)\s*.*?(\d+(?:\.\d+)?)\s*(k|cr|crore|lakh)',
+            content, re.IGNORECASE
+        )
+        if budget_match:
+            pass  # placeholder for future budget extraction
+
+    return {"route": route, "buyer_profile": buyer_profile}
 
 
 def structured_retrieval_node(state: ConciergeState) -> Dict[str, Any]:
@@ -75,17 +104,8 @@ def structured_retrieval_node(state: ConciergeState) -> Dict[str, Any]:
     max_price = buyer_profile.get("max_price")
     tower = buyer_profile.get("tower")
 
-    # If BHK not explicitly given in buyer_profile, extract from user query
-    if bhk is None and user_query:
-        bhk_match = re.search(r'(\d+)\s*bhk', user_query, re.IGNORECASE)
-        if bhk_match:
-            try:
-                bhk = int(bhk_match.group(1))
-            except ValueError:
-                pass
-
     results = query_units(bhk=bhk, max_price=max_price, tower=tower)
-    return {"structured_results": results}
+    return {"structured_results": results, "buyer_profile": buyer_profile}
 
 
 def brochure_retrieval_node(state: ConciergeState) -> Dict[str, Any]:
@@ -135,27 +155,84 @@ def generation_node(state: ConciergeState) -> Dict[str, Any]:
 
             draft = response.choices[0].message.content
             return {"draft_response": draft}
-        except Exception:
-            pass
+        except Exception as exc:
+            import sys as _sys
+            print(f"[generation_node] Groq call failed: {exc}", file=_sys.stderr)
+            # Fall through to offline synthesiser — do NOT silently produce a data dump
 
-    # Safe deterministic response generator when offline / without LLM API key
+    # -------------------------------------------------------------------
+    # Offline / API-unavailable fallback.
+    # IMPORTANT: answer the ACTUAL question, do not just dump retrieved data.
+    # We inspect user_query to pick the most relevant subset and form a
+    # direct sentence rather than a verbatim raw list.
+    # -------------------------------------------------------------------
     route = state.get("route", "both")
+    lower_q = user_query.lower()
 
-    if structured_results and brochure_chunks:
+    # Questions about counts / availability → summarise structured data
+    is_count_question = any(k in lower_q for k in ["how many", "count", "number of", "how much"])
+    # Questions about builder / developer / reputation → brochure only
+    is_builder_question = any(k in lower_q for k in ["builder", "developer", "who built", "reputation", "well known", "well-known", "company", "established"])
+    # Follow-up subjective questions that reference prior context
+    is_subjective = any(k in lower_q for k in ["is he", "is she", "is it", "is the", "are they", "would you", "do you think", "reliable", "trustworthy"])
+
+    if is_builder_question or (is_subjective and not structured_results):
+        # Pure brochure question — answer only from brochure chunks
+        if brochure_chunks:
+            relevant = " ".join(brochure_chunks[:2])
+            draft = (
+                f"Based on the project brochure: {relevant}\n\n"
+                "Note: I can only share what's stated in the brochure material. "
+                "For independent verification of the developer's track record, I'd recommend checking RERA or speaking with our sales team."
+            )
+        else:
+            draft = "I don't have developer or builder details in the loaded brochure data at the moment. Would you like me to connect you with our sales team?"
+
+    elif is_count_question and structured_results:
+        available = [u for u in structured_results if str(u.get("status", "")).lower() == "available"]
+        count = len(available) if available else len(structured_results)
+        bhk_types = sorted(set(u["bhk"] for u in structured_results))
+        prices = [u["price_inr"] for u in structured_results if u.get("price_inr")]
+        price_note = ""
+        if prices:
+            price_note = f", priced between ₹{min(prices):,} and ₹{max(prices):,}"
+        draft = (
+            f"There are currently {count} unit(s) available"
+            + (f" in {bhk_types} BHK configurations" if bhk_types else "")
+            + price_note + ". "
+            "Would you like details on any specific configuration?"
+        )
+
+    elif structured_results and not brochure_chunks:
+        available = [u for u in structured_results if str(u.get("status", "")).lower() == "available"]
+        count = len(available) if available else len(structured_results)
+        bhk_types = sorted(set(u["bhk"] for u in structured_results))
         unit_strs = [
-            f"Unit {u['unit_id']} ({u['bhk']} BHK in {u['tower']}, Floor {u['floor']}) — {u['area_sqft']} sq.ft at ₹{u['price_inr']}, possession by {u['possession_date']} [{u['status']}]"
+            f"Unit {u['unit_id']} ({u['bhk']} BHK, {u['tower']}, Floor {u['floor']}, "
+            f"{u['area_sqft']} sq.ft, ₹{u['price_inr']:,}, possession {u['possession_date']}) [{u['status']}]"
             for u in structured_results
         ]
-        draft = "Here are the matching units:\n" + "\n".join(unit_strs)
-        draft += "\n\nFrom the brochure:\n" + "\n".join(brochure_chunks[:2])
-    elif structured_results:
-        unit_strs = [
-            f"Unit {u['unit_id']} ({u['bhk']} BHK in {u['tower']}, Floor {u['floor']}) — {u['area_sqft']} sq.ft at ₹{u['price_inr']}, possession by {u['possession_date']} [{u['status']}]"
-            for u in structured_results
-        ]
-        draft = "Here are the available units matching your criteria:\n" + "\n".join(unit_strs)
-    elif brochure_chunks:
-        draft = "\n\n".join(brochure_chunks[:3])
+        draft = (
+            f"Found {count} matching unit(s) in {bhk_types} BHK configurations:\n"
+            + "\n".join(unit_strs)
+        )
+
+    elif brochure_chunks and not structured_results:
+        draft = " ".join(brochure_chunks[:2])
+
+    elif structured_results and brochure_chunks:
+        # Mixed question — give a concise summary, not a raw dump
+        available = [u for u in structured_results if str(u.get("status", "")).lower() == "available"]
+        count = len(available) if available else len(structured_results)
+        bhk_types = sorted(set(u["bhk"] for u in structured_results))
+        prices = [u["price_inr"] for u in structured_results if u.get("price_inr")]
+        price_note = f", ranging from ₹{min(prices):,} to ₹{max(prices):,}" if prices else ""
+        brochure_summary = brochure_chunks[0] if brochure_chunks else ""
+        draft = (
+            f"{count} unit(s) available in {bhk_types} BHK configurations{price_note}.\n\n"
+            f"From the brochure: {brochure_summary}"
+        )
+
     else:
         if route == "brochure":
             draft = "I don't have brochure details loaded at the moment. Would you like me to connect you with our sales team for project information?"
@@ -174,12 +251,17 @@ def guardrail_node(state: ConciergeState) -> Dict[str, Any]:
     """
     draft_response = state.get("draft_response", "")
     structured_results = state.get("structured_results", [])
+    brochure_chunks = state.get("brochure_chunks", [])
 
-    # Extract all valid text tokens from structured_results to cross-check
+    # Extract all valid text tokens from structured_results and brochure_chunks to cross-check
     valid_values = []
     for res in structured_results:
         for val in res.values():
             valid_values.append(str(val).lower().replace(",", ""))
+            
+    for chunk in brochure_chunks:
+        valid_values.append(str(chunk).lower().replace(",", ""))
+        
     valid_text = " ".join(valid_values)
 
     clean_draft = draft_response.lower()
@@ -199,7 +281,8 @@ def guardrail_node(state: ConciergeState) -> Dict[str, Any]:
     if not violation:
         unit_matches = re.findall(r'\b\d+(?:\.\d+)?\s*(?:cr|crore|crores|lakh|lakhs)\b', clean_draft)
         for match in unit_matches:
-            if match not in valid_text:
+            num = re.sub(r'[^\d.]', '', match)
+            if num and num not in valid_text:
                 violation = True
                 break
 

@@ -1,7 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_astradb import AstraDBVectorStore
@@ -9,19 +9,19 @@ from langchain_astradb import AstraDBVectorStore
 load_dotenv()
 
 DEFAULT_PDF_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "data", "brochure_sample.pdf")
+    os.path.join(os.path.dirname(__file__), "..", "..", "data", "brochure_sample.txt")
 )
 COLLECTION_NAME = "brochure_chunks"
 EMBEDDING_MODEL = os.getenv("HF_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 
 
-def ingest_brochure(pdf_path: str = DEFAULT_PDF_PATH, collection_name: str = COLLECTION_NAME):
+def ingest_brochure(file_path: str = DEFAULT_PDF_PATH, collection_name: str = COLLECTION_NAME):
     """
     Loads a brochure PDF, splits into chunks, tags metadata, embeds with HuggingFace,
     and inserts into an AstraDBVectorStore collection.
     """
-    if not os.path.exists(pdf_path):
-        raise FileNotFoundError(f"PDF file not found at path: {pdf_path}")
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found at path: {file_path}")
 
     api_endpoint = os.getenv("ASTRA_DB_API_ENDPOINT")
     token = os.getenv("ASTRA_DB_APPLICATION_TOKEN")
@@ -33,8 +33,11 @@ def ingest_brochure(pdf_path: str = DEFAULT_PDF_PATH, collection_name: str = COL
             "Please check ASTRA_DB_API_ENDPOINT and ASTRA_DB_APPLICATION_TOKEN."
         )
 
-    print(f"Loading PDF from: {pdf_path} ...")
-    loader = PyPDFLoader(pdf_path)
+    print(f"Loading file from: {file_path} ...")
+    if file_path.endswith(".txt"):
+        loader = TextLoader(file_path, encoding='utf-8')
+    else:
+        loader = PyPDFLoader(file_path)
     docs = loader.load()
     print(f"Loaded {len(docs)} page(s).")
 
@@ -76,7 +79,7 @@ def ingest_brochure(pdf_path: str = DEFAULT_PDF_PATH, collection_name: str = COL
 if __name__ == "__main__":
     target_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PDF_PATH
     try:
-        ingest_brochure(pdf_path=target_path)
+        ingest_brochure(file_path=target_path)
     except Exception as e:
         print(f"Error during brochure ingestion: {e}", file=sys.stderr)
         sys.exit(1)

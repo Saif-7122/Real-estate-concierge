@@ -20,7 +20,9 @@ workflow.add_node("guardrail_check", guardrail_node)
 def route_after_router(state: ConciergeState) -> str:
     """Determine the next node based on the router's classification."""
     route = state.get("route", "both")
-    if route == "structured":
+    if route == "greeting":
+        return "generate"
+    elif route == "structured":
         return "structured_retrieval"
     elif route == "brochure":
         return "brochure_retrieval"
@@ -41,6 +43,7 @@ workflow.add_conditional_edges(
     "router", 
     route_after_router,
     {
+        "generate": "generate",
         "structured_retrieval": "structured_retrieval",
         "brochure_retrieval": "brochure_retrieval"
     }
@@ -61,3 +64,4 @@ workflow.add_edge("guardrail_check", END)
 
 # Compile the final agent application
 concierge_app = workflow.compile()
+

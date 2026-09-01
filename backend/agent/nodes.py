@@ -270,31 +270,35 @@ def guardrail_node(state: ConciergeState) -> Dict[str, Any]:
 
     violation = False
 
+    suspicious_prices = []
+    suspicious_dates = []
+
     # 1. Check for currency symbols followed by numbers (e.g., ₹25000000, Rs. 1.5, INR 50000)
     currency_matches = re.findall(r'(?:₹|rs\.?|inr|\$)\s*[\d,]+(?:\.\d+)?', clean_draft)
     if currency_matches:
         for match in currency_matches:
             num = re.sub(r'[^\d.]', '', match)
             if num and num not in valid_text:
+                suspicious_prices.append(match)
                 violation = True
-                break
 
     # 2. Check for Indian numbering units (e.g. 1.5 cr, 2.5 crore, 85 lakhs)
-    if not violation:
-        unit_matches = re.findall(r'\b\d+(?:\.\d+)?\s*(?:cr|crore|crores|lakh|lakhs)\b', clean_draft)
-        for match in unit_matches:
-            num = re.sub(r'[^\d.]', '', match)
-            if num and num not in valid_text:
-                violation = True
-                break
+    unit_matches = re.findall(r'\b\d+(?:\.\d+)?\s*(?:cr|crore|crores|lakh|lakhs)\b', clean_draft)
+    for match in unit_matches:
+        num = re.sub(r'[^\d.]', '', match)
+        if num and num not in valid_text:
+            suspicious_prices.append(match)
+            violation = True
 
     # 3. Check for years and dates (e.g. 2024-2030)
-    if not violation:
-        dates = re.findall(r'\b(202[0-9]|203[0-9])\b', clean_draft)
-        for date in dates:
-            if date not in valid_text:
-                violation = True
-                break
+    dates = re.findall(r'\b(202[0-9]|203[0-9])\b', clean_draft)
+    for date in dates:
+        if date not in valid_text:
+            suspicious_dates.append(date)
+            violation = True
+
+    if suspicious_prices or suspicious_dates:
+        print(f"[DEBUG guardrail_node] Guardrail fired! suspicious_prices={suspicious_prices}, suspicious_dates={suspicious_dates}, draft={draft_response}")
 
     if violation:
         return {
